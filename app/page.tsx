@@ -1,65 +1,386 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
+
+interface EscolaSAEB {
+  id: string;
+  escola: string;
+  municipio: string;
+  rede: string;
+  etapa: string;
+  lp: number;
+  mat: number;
+  alunos_presentes: number;
+  alunos_matriculados: number;
+}
 
 export default function Home() {
+  const [dados, setDados] = useState<EscolaSAEB[]>([]);
+  const [etapa, setEtapa] = useState('5º');
+  const [disciplina, setDisciplina] = useState('geral');
+  const [taxaFluxo, setTaxaFluxo] = useState(1);
+  const [escolaSelecionada, setEscolaSelecionada] = useState('todas');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/saeb.json')
+      .then(res => res.json())
+      .then(data => {
+        setDados(data);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Carregando dados do SAEB...</div>
+      </div>
+    );
+  }
+
+  // Filtrar por etapa
+  let dadosFiltrados = dados.filter(d => d.etapa === etapa);
+  
+  // Filtrar por escola
+  if (escolaSelecionada !== 'todas') {
+    dadosFiltrados = dadosFiltrados.filter(d => d.escola === escolaSelecionada);
+  }
+
+  // Calcular médias
+  const mediaLP = dadosFiltrados.reduce((acc, d) => acc + d.lp, 0) / (dadosFiltrados.length || 1);
+  const mediaMAT = dadosFiltrados.reduce((acc, d) => acc + d.mat, 0) / (dadosFiltrados.length || 1);
+  const mediaGeral = (mediaLP + mediaMAT) / 2;
+
+  // NOTA SAEB (0-10)
+  // Fórmula: (média geral / 50) × taxa de fluxo
+  const notaSAEB = (mediaGeral / 50) * taxaFluxo;
+
+  // Função para calcular nota SAEB de uma escola específica
+  const calcularNotaSAEB = (escola: EscolaSAEB) => {
+    const mediaEscola = (escola.lp + escola.mat) / 2;
+    return (mediaEscola / 50) * taxaFluxo;
+  };
+
+  // Para exibição no card (com base no filtro de disciplina)
+  let valorExibicao = 0;
+  let rotuloExibicao = '';
+  
+  if (disciplina === 'lp') {
+    valorExibicao = mediaLP;
+    rotuloExibicao = 'Língua Portuguesa';
+  } else if (disciplina === 'mat') {
+    valorExibicao = mediaMAT;
+    rotuloExibicao = 'Matemática';
+  } else {
+    valorExibicao = mediaGeral;
+    rotuloExibicao = 'Geral (LP + MAT)';
+  }
+
+  // Dados para o gráfico por escola
+  const dadosGrafico = dadosFiltrados.map(d => {
+    const mediaEscola = (d.lp + d.mat) / 2;
+    const notaEscola = (mediaEscola / 50) * taxaFluxo;
+    
+    return {
+      escola: d.escola.length > 35 ? d.escola.substring(0, 32) + '...' : d.escola,
+      'Língua Portuguesa': Math.round(d.lp),
+      Matemática: Math.round(d.mat),
+      'Média Geral': Math.round(mediaEscola),
+      'Nota SAEB (0-10)': Number(notaEscola.toFixed(1)),
+      notaOriginal: notaEscola
+    };
+  });
+
+  // Ordenar por nota SAEB (decrescente)
+  const dadosGraficoOrdenados = [...dadosGrafico].sort((a, b) => b.notaOriginal - a.notaOriginal);
+
+  // Lista única de escolas para o filtro
+  const escolasUnicas = [...new Set(dados.filter(d => d.etapa === etapa).map(d => d.escola))];
+
+  // Cor da nota SAEB baseada no valor
+  const getNotaCor = (nota: number) => {
+    if (nota >= 7) return 'text-green-600';
+    if (nota >= 5) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getFundoNota = (nota: number) => {
+    if (nota >= 7) return 'bg-green-100 border-green-300';
+    if (nota >= 5) return 'bg-yellow-100 border-yellow-300';
+    return 'bg-red-100 border-red-300';
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-gray-50">
+      {/* Cabeçalho */}
+      <div className="bg-blue-800 text-white p-6 shadow-lg">
+        <h1 className="text-3xl font-bold">📊 Dashboard SAEB 2025</h1>
+        <p className="text-blue-200 mt-2">Resultados preliminares por escola | Nota padronizada 0 a 10</p>
+      </div>
+
+      <div className="p-6">
+        {/* Painel de Filtros */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">🎛️ Filtros</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Filtro Etapa */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Etapa de Ensino</label>
+              <select
+                value={etapa}
+                onChange={(e) => setEtapa(e.target.value)}
+                className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="5º">5º Ano do Ensino Fundamental</option>
+                <option value="9º">9º Ano do Ensino Fundamental</option>
+              </select>
+            </div>
+
+            {/* Filtro Disciplina */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Visualizar</label>
+              <select
+                value={disciplina}
+                onChange={(e) => setDisciplina(e.target.value)}
+                className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="geral">📊 Nota SAEB (0-10)</option>
+                <option value="lp">📖 Média Língua Portuguesa</option>
+                <option value="mat">🔢 Média Matemática</option>
+              </select>
+            </div>
+
+            {/* Filtro Escola */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Escola</label>
+              <select
+                value={escolaSelecionada}
+                onChange={(e) => setEscolaSelecionada(e.target.value)}
+                className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="todas">🏫 Todas as escolas</option>
+                {escolasUnicas.map((escola, idx) => (
+                  <option key={idx} value={escola}>{escola}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Taxa de Fluxo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Taxa de Aprovação (Fluxo)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                value={taxaFluxo}
+                onChange={(e) => setTaxaFluxo(Number(e.target.value))}
+                className={`w-full border rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  taxaFluxo === 1 ? 'bg-green-100 border-green-400' : 'bg-yellow-50 border-yellow-400'
+                }`}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {taxaFluxo === 1 ? '✓ Padrão (100%)' : '⚠️ Modo simulação'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Cards de Resultado */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          {/* Card LP */}
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-md p-6 text-white">
+            <p className="text-sm opacity-90">📖 Média em Português</p>
+            <p className="text-3xl font-bold mt-2">{Math.round(mediaLP)}</p>
+            <p className="text-xs mt-2">Base: {dadosFiltrados.length} escolas</p>
+          </div>
+          
+          {/* Card MAT */}
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-md p-6 text-white">
+            <p className="text-sm opacity-90">🔢 Média em Matemática</p>
+            <p className="text-3xl font-bold mt-2">{Math.round(mediaMAT)}</p>
+            <p className="text-xs mt-2">Base: {dadosFiltrados.length} escolas</p>
+          </div>
+          
+          {/* Card Média Geral */}
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-md p-6 text-white">
+            <p className="text-sm opacity-90">📊 Média Geral (LP+MAT)/2</p>
+            <p className="text-3xl font-bold mt-2">{Math.round(mediaGeral)}</p>
+            <p className="text-xs mt-2">Pontuação bruta SAEB</p>
+          </div>
+
+          {/* Card Nota SAEB */}
+          <div className={`rounded-lg shadow-md p-6 text-white ${
+            taxaFluxo === 1 
+              ? 'bg-gradient-to-r from-indigo-600 to-indigo-700' 
+              : 'bg-gradient-to-r from-orange-600 to-orange-700'
+          }`}>
+            <p className="text-sm opacity-90">
+              {taxaFluxo === 1 ? '⭐ NOTA SAEB (0-10)' : '🎲 SIMULAÇÃO SAEB'}
+            </p>
+            <p className="text-4xl font-bold mt-2">{notaSAEB.toFixed(1)}</p>
+            <p className="text-xs mt-2">
+              Fórmula: (Média Geral ÷ 50) × {Math.round(taxaFluxo * 100)}%
+            </p>
+          </div>
+        </div>
+
+        {/* Explicação da Fórmula */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-blue-800">
+            📐 <strong>Fórmula da Nota SAEB (0-10):</strong> 
+            [(Média LP + Média MAT) / 2] ÷ 50 × Taxa de Fluxo
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            Exemplo: Média 250 ÷ 50 = 5,0 × Fluxo (1,0) = Nota 5,0
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Gráfico de Barras por Escola - Nota SAEB */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">
+            🏆 Ranking das Escolas - Nota SAEB (0 a 10)
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Ordenado da maior para a menor nota | Taxa de fluxo atual: {Math.round(taxaFluxo * 100)}%
+          </p>
+          <ResponsiveContainer width="100%" height={500}>
+            <BarChart 
+              data={dadosGraficoOrdenados} 
+              layout="vertical" 
+              margin={{ left: 120, right: 30, top: 20, bottom: 20 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                type="number" 
+                domain={[0, 10]} 
+                tickCount={11}
+                label={{ value: 'Nota SAEB (0-10)', position: 'bottom', offset: 0 }}
+              />
+              <YAxis 
+                type="category" 
+                dataKey="escola" 
+                width={250} 
+                tick={{ fontSize: 11 }} 
+              />
+              <Tooltip 
+                formatter={(value: any) => [`${value} pontos`, 'Nota SAEB']}
+                labelFormatter={(label) => `Escola: ${label}`}
+              />
+              <Legend />
+              <Bar dataKey="Nota SAEB (0-10)" fill="#6366f1" radius={[0, 4, 4, 0]}>
+                {dadosGraficoOrdenados.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.notaOriginal >= 7 ? '#22c55e' : entry.notaOriginal >= 5 ? '#eab308' : '#ef4444'} 
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-      </main>
+
+        {/* Gráfico comparativo LP x MAT */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">📊 Comparativo: Português vs Matemática (Médias Brutas)</h2>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={dadosGrafico} margin={{ left: 100, right: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="category" dataKey="escola" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 10 }} />
+              <YAxis type="number" domain={[0, 350]} label={{ value: 'Média SAEB', angle: -90, position: 'left' }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="Língua Portuguesa" fill="#3b82f6" />
+              <Bar dataKey="Matemática" fill="#10b981" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Tabela de Escolas com Nota SAEB */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-lg font-semibold mb-4">📋 Detalhamento por Escola</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Escola</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LP</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MAT</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Média Bruta</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota SAEB (0-10)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alunos</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dadosFiltrados.map((escola, idx) => {
+                  const mediaBruta = (escola.lp + escola.mat) / 2;
+                  const notaSAEBEscola = (mediaBruta / 50) * taxaFluxo;
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">{escola.escola}</td>
+                      <td className="px-6 py-4 text-sm font-medium">{Math.round(escola.lp)}</td>
+                      <td className="px-6 py-4 text-sm font-medium">{Math.round(escola.mat)}</td>
+                      <td className="px-6 py-4 text-sm">{Math.round(mediaBruta)}</td>
+                      <td className={`px-6 py-4 text-sm font-bold ${getNotaCor(notaSAEBEscola)}`}>
+                        {notaSAEBEscola.toFixed(1)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{escola.alunos_presentes}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          
+          {dadosFiltrados.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma escola encontrada para os filtros selecionados.
+            </div>
+          )}
+        </div>
+
+        {/* Legenda de Cores */}
+        <div className="mt-6 bg-white rounded-lg shadow-md p-4">
+          <h3 className="text-sm font-semibold mb-2">📌 Legenda da Nota SAEB (0-10)</h3>
+          <div className="flex gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-500 rounded"></div>
+              <span>Nota ≥ 7 (Bom)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+              <span>5 ≤ Nota &lt; 7 (Regular)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-500 rounded"></div>
+              <span>Nota &lt; 5 (Atenção)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Rodapé */}
+        <div className="mt-6 text-center text-xs text-gray-400">
+          <p>Dashboard SAEB 2025 - Resultados preliminares</p>
+          <p className="mt-1">
+            Fórmula: <strong>Nota SAEB = [(Média LP + Média MAT) / 2] ÷ 50 × Taxa de Fluxo</strong>
+          </p>
+          <p className="mt-1">Taxa de fluxo padrão: 100% (verde) | Valores entre 0 e 10</p>
+        </div>
+      </div>
     </div>
   );
 }

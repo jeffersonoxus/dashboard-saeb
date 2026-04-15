@@ -25,6 +25,13 @@ interface EscolaSAEB {
   alunos_matriculados: number;
 }
 
+interface NivelProficiencia {
+  nivel: string;
+  cor: string;
+  corFundo: string;
+  descricao: string;
+}
+
 export default function Home() {
   const [dados, setDados] = useState<EscolaSAEB[]>([]);
   const [etapa, setEtapa] = useState('5º');
@@ -41,6 +48,121 @@ export default function Home() {
         setLoading(false);
       });
   }, []);
+
+  // 📊 FUNÇÃO: Classificar proficiência baseado nas escalas oficiais do INEP
+  const classificarProficiencia = (notaSAEB: number, etapa: string, disciplinaTipo: 'lp' | 'mat'): NivelProficiencia => {
+    // Converter nota 0-10 de volta para escala 0-500
+    const escalaOriginal = notaSAEB * 50;
+    
+    // Parâmetros oficiais do INEP baseados nas escalas de proficiência do SAEB
+    // Fonte: INEP - Escalas de Proficiência SAEB
+    const niveis: any = {
+      '5º': {
+        lp: {
+          abaixo: 200,
+          basico: 200,
+          adequado: 250,
+          avancado: 300
+        },
+        mat: {
+          abaixo: 225,
+          basico: 225,
+          adequado: 275,
+          avancado: 325
+        }
+      },
+      '9º': {
+        lp: {
+          abaixo: 250,
+          basico: 250,
+          adequado: 300,
+          avancado: 350
+        },
+        mat: {
+          abaixo: 275,
+          basico: 275,
+          adequado: 325,
+          avancado: 375
+        }
+      }
+    };
+    
+    const params = niveis[etapa as '5º' | '9º'][disciplinaTipo];
+    
+    if (escalaOriginal >= params.avancado) {
+      return { 
+        nivel: 'Avançado', 
+        cor: 'text-green-700',
+        corFundo: 'bg-green-100 border-green-300',
+        descricao: 'Desempenho muito acima do esperado para a etapa'
+      };
+    }
+    if (escalaOriginal >= params.adequado) {
+      return { 
+        nivel: 'Adequado', 
+        cor: 'text-blue-700',
+        corFundo: 'bg-blue-100 border-blue-300',
+        descricao: 'Desempenho adequado para a etapa'
+      };
+    }
+    if (escalaOriginal >= params.basico) {
+      return { 
+        nivel: 'Básico', 
+        cor: 'text-yellow-700',
+        corFundo: 'bg-yellow-100 border-yellow-300',
+        descricao: 'Desempenho básico, precisa de atenção'
+      };
+    }
+    return { 
+      nivel: 'Abaixo do básico', 
+      cor: 'text-red-700',
+      corFundo: 'bg-red-100 border-red-300',
+      descricao: 'Desempenho crítico, necessita intervenção prioritária'
+    };
+  };
+
+  // Classificar por média geral (LP+MAT combinados)
+  const classificarProficienciaGeral = (notaSAEB: number, etapa: string): NivelProficiencia => {
+    const escalaOriginal = notaSAEB * 50;
+    
+    const niveis: any = {
+      '5º': { abaixo: 212, basico: 212, adequado: 262, avancado: 312 },
+      '9º': { abaixo: 262, basico: 262, adequado: 312, avancado: 362 }
+    };
+    
+    const params = niveis[etapa as '5º' | '9º'];
+    
+    if (escalaOriginal >= params.avancado) {
+      return { 
+        nivel: 'Avançado', 
+        cor: 'text-green-700',
+        corFundo: 'bg-green-100 border-green-300',
+        descricao: 'Desempenho muito acima do esperado'
+      };
+    }
+    if (escalaOriginal >= params.adequado) {
+      return { 
+        nivel: 'Adequado', 
+        cor: 'text-blue-700',
+        corFundo: 'bg-blue-100 border-blue-300',
+        descricao: 'Desempenho adequado para a etapa'
+      };
+    }
+    if (escalaOriginal >= params.basico) {
+      return { 
+        nivel: 'Básico', 
+        cor: 'text-yellow-700',
+        corFundo: 'bg-yellow-100 border-yellow-300',
+        descricao: 'Desempenho básico'
+      };
+    }
+    return { 
+      nivel: 'Abaixo do básico', 
+      cor: 'text-red-700',
+      corFundo: 'bg-red-100 border-red-300',
+      descricao: 'Desempenho crítico'
+    };
+  };
 
   if (loading) {
     return (
@@ -66,6 +188,7 @@ export default function Home() {
   // NOTA SAEB (0-10)
   // Fórmula: (média geral / 50) × taxa de fluxo
   const notaSAEB = (mediaGeral / 50) * taxaFluxo;
+  const classificacaoGeral = classificarProficienciaGeral(notaSAEB, etapa);
 
   // Função para calcular nota SAEB de uma escola específica
   const calcularNotaSAEB = (escola: EscolaSAEB) => {
@@ -73,25 +196,12 @@ export default function Home() {
     return (mediaEscola / 50) * taxaFluxo;
   };
 
-  // Para exibição no card (com base no filtro de disciplina)
-  let valorExibicao = 0;
-  let rotuloExibicao = '';
-  
-  if (disciplina === 'lp') {
-    valorExibicao = mediaLP;
-    rotuloExibicao = 'Língua Portuguesa';
-  } else if (disciplina === 'mat') {
-    valorExibicao = mediaMAT;
-    rotuloExibicao = 'Matemática';
-  } else {
-    valorExibicao = mediaGeral;
-    rotuloExibicao = 'Geral (LP + MAT)';
-  }
-
   // Dados para o gráfico por escola
   const dadosGrafico = dadosFiltrados.map(d => {
     const mediaEscola = (d.lp + d.mat) / 2;
     const notaEscola = (mediaEscola / 50) * taxaFluxo;
+    const classificacaoLP = classificarProficiencia(notaEscola, etapa, 'lp');
+    const classificacaoMAT = classificarProficiencia(notaEscola, etapa, 'mat');
     
     return {
       escola: d.escola.length > 35 ? d.escola.substring(0, 32) + '...' : d.escola,
@@ -99,7 +209,11 @@ export default function Home() {
       Matemática: Math.round(d.mat),
       'Média Geral': Math.round(mediaEscola),
       'Nota SAEB (0-10)': Number(notaEscola.toFixed(1)),
-      notaOriginal: notaEscola
+      notaOriginal: notaEscola,
+      nivelLP: classificacaoLP.nivel,
+      nivelMAT: classificacaoMAT.nivel,
+      corNivelLP: classificacaoLP.corFundo,
+      corNivelMAT: classificacaoMAT.corFundo
     };
   });
 
@@ -116,18 +230,12 @@ export default function Home() {
     return 'text-red-600';
   };
 
-  const getFundoNota = (nota: number) => {
-    if (nota >= 7) return 'bg-green-100 border-green-300';
-    if (nota >= 5) return 'bg-yellow-100 border-yellow-300';
-    return 'bg-red-100 border-red-300';
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Cabeçalho */}
       <div className="bg-blue-800 text-white p-6 shadow-lg">
         <h1 className="text-3xl font-bold">📊 Dashboard SAEB 2025</h1>
-        <p className="text-blue-200 mt-2">Resultados preliminares por escola | Nota padronizada 0 a 10</p>
+        <p className="text-blue-200 mt-2">Resultados preliminares por escola | Nota padronizada 0 a 10 | Níveis INEP</p>
       </div>
 
       <div className="p-6">
@@ -239,6 +347,21 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Classificação Geral da Rede */}
+        <div className={`${classificacaoGeral.corFundo} border rounded-lg p-4 mb-6`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">📈 Classificação da Rede - {etapa} ano</p>
+              <p className={`text-2xl font-bold ${classificacaoGeral.cor}`}>{classificacaoGeral.nivel}</p>
+              <p className="text-xs text-gray-600 mt-1">{classificacaoGeral.descricao}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm">Nota SAEB: <strong>{notaSAEB.toFixed(1)}</strong></p>
+              <p className="text-xs text-gray-500">Escala original: {Math.round(mediaGeral)} pontos</p>
+            </div>
+          </div>
+        </div>
+
         {/* Explicação da Fórmula */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <p className="text-sm text-blue-800">
@@ -248,6 +371,31 @@ export default function Home() {
           <p className="text-xs text-blue-600 mt-1">
             Exemplo: Média 250 ÷ 50 = 5,0 × Fluxo (1,0) = Nota 5,0
           </p>
+        </div>
+
+        {/* Tabela de Níveis de Proficiência - Referência */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <h3 className="text-sm font-semibold mb-3">📖 Referência: Níveis de Proficiência SAEB - {etapa} ano</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="font-medium mb-2">Língua Portuguesa</p>
+              <div className="space-y-1">
+                <div className="flex justify-between"><span>Abaixo do básico:</span><span>&lt; {etapa === '5º' ? '200' : '250'}</span></div>
+                <div className="flex justify-between"><span>Básico:</span><span>{etapa === '5º' ? '200-249' : '250-299'}</span></div>
+                <div className="flex justify-between"><span>Adequado:</span><span>{etapa === '5º' ? '250-299' : '300-349'}</span></div>
+                <div className="flex justify-between"><span>Avançado:</span><span>≥ {etapa === '5º' ? '300' : '350'}</span></div>
+              </div>
+            </div>
+            <div>
+              <p className="font-medium mb-2">Matemática</p>
+              <div className="space-y-1">
+                <div className="flex justify-between"><span>Abaixo do básico:</span><span>&lt; {etapa === '5º' ? '225' : '275'}</span></div>
+                <div className="flex justify-between"><span>Básico:</span><span>{etapa === '5º' ? '225-274' : '275-324'}</span></div>
+                <div className="flex justify-between"><span>Adequado:</span><span>{etapa === '5º' ? '275-324' : '325-374'}</span></div>
+                <div className="flex justify-between"><span>Avançado:</span><span>≥ {etapa === '5º' ? '325' : '375'}</span></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Gráfico de Barras por Escola - Nota SAEB */}
@@ -310,7 +458,7 @@ export default function Home() {
           </ResponsiveContainer>
         </div>
 
-        {/* Tabela de Escolas com Nota SAEB */}
+        {/* Tabela de Escolas com Nota SAEB e Níveis */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold mb-4">📋 Detalhamento por Escola</h2>
           <div className="overflow-x-auto">
@@ -319,9 +467,11 @@ export default function Home() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Escola</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LP</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nível LP</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MAT</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Média Bruta</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota SAEB (0-10)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nível MAT</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Média</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota SAEB</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alunos</th>
                 </tr>
               </thead>
@@ -329,15 +479,24 @@ export default function Home() {
                 {dadosFiltrados.map((escola, idx) => {
                   const mediaBruta = (escola.lp + escola.mat) / 2;
                   const notaSAEBEscola = (mediaBruta / 50) * taxaFluxo;
+                  const nivelLP = classificarProficiencia(notaSAEBEscola, etapa, 'lp');
+                  const nivelMAT = classificarProficiencia(notaSAEBEscola, etapa, 'mat');
+                  
                   return (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">{escola.escola}</td>
                       <td className="px-6 py-4 text-sm font-medium">{Math.round(escola.lp)}</td>
+                      <td className={`px-6  py-4 text-sm rounded-full ${nivelLP.corFundo} ${nivelLP.cor} font-medium`}>
+                        {nivelLP.nivel}
+                      </td>
                       <td className="px-6 py-4 text-sm font-medium">{Math.round(escola.mat)}</td>
+                      <td className={`px-6 py-4 text-sm rounded-full ${nivelMAT.corFundo} ${nivelMAT.cor} font-medium`}>
+                        {nivelMAT.nivel}
+                       </td>
                       <td className="px-6 py-4 text-sm">{Math.round(mediaBruta)}</td>
                       <td className={`px-6 py-4 text-sm font-bold ${getNotaCor(notaSAEBEscola)}`}>
                         {notaSAEBEscola.toFixed(1)}
-                      </td>
+                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">{escola.alunos_presentes}</td>
                     </tr>
                   );
@@ -356,18 +515,44 @@ export default function Home() {
         {/* Legenda de Cores */}
         <div className="mt-6 bg-white rounded-lg shadow-md p-4">
           <h3 className="text-sm font-semibold mb-2">📌 Legenda da Nota SAEB (0-10)</h3>
-          <div className="flex gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-500 rounded"></div>
-              <span>Nota ≥ 7 (Bom)</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+            <div className="space-y-2">
+              <p className="font-medium">Classificação por Nota</p>
+              <div className="flex gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-500 rounded"></div>
+                  <span>Nota ≥ 7 (Bom)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+                  <span>5 ≤ Nota &lt; 7 (Regular)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-500 rounded"></div>
+                  <span>Nota &lt; 5 (Atenção)</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-              <span>5 ≤ Nota &lt; 7 (Regular)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-500 rounded"></div>
-              <span>Nota &lt; 5 (Atenção)</span>
+            <div className="space-y-2">
+              <p className="font-medium">Níveis de Proficiência INEP</p>
+              <div className="flex flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+                  <span>Avançado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
+                  <span>Adequado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
+                  <span>Básico</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+                  <span>Abaixo do básico</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -378,7 +563,9 @@ export default function Home() {
           <p className="mt-1">
             Fórmula: <strong>Nota SAEB = [(Média LP + Média MAT) / 2] ÷ 50 × Taxa de Fluxo</strong>
           </p>
-          <p className="mt-1">Taxa de fluxo padrão: 100% (verde) | Valores entre 0 e 10</p>
+          <p className="mt-1">
+            Níveis de proficiência baseados nas escalas oficiais do INEP | Taxa de fluxo padrão: 100% (verde)
+          </p>
         </div>
       </div>
     </div>

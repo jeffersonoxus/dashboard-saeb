@@ -39,23 +39,22 @@ export default function Home() {
   const [taxaFluxo, setTaxaFluxo] = useState(1);
   const [escolaSelecionada, setEscolaSelecionada] = useState('todas');
   const [loading, setLoading] = useState(true);
+  
+  // States para o modal de código
+  const [showCodeModal, setShowCodeModal] = useState(true);
+  const [codigo, setCodigo] = useState('');
+  const [codigoErro, setCodigoErro] = useState('');
+  const [codigoVerificado, setCodigoVerificado] = useState(false);
 
-  useEffect(() => {
-    fetch('/saeb.json')
-      .then(res => res.json())
-      .then(data => {
-        setDados(data);
-        setLoading(false);
-      });
-  }, []);
-
-  // 📊 FUNÇÃO: Classificar proficiência baseado nas escalas oficiais do INEP
+  // ============================================
+  // FUNÇÕES DE CLASSIFICAÇÃO (declaradas primeiro)
+  // ============================================
+  
   const classificarProficiencia = (notaSAEB: number, etapa: string, disciplinaTipo: 'lp' | 'mat'): NivelProficiencia => {
     // Converter nota 0-10 de volta para escala 0-500
     const escalaOriginal = notaSAEB * 50;
     
     // Parâmetros oficiais do INEP baseados nas escalas de proficiência do SAEB
-    // Fonte: INEP - Escalas de Proficiência SAEB
     const niveis: any = {
       '5º': {
         lp: {
@@ -121,7 +120,6 @@ export default function Home() {
     };
   };
 
-  // Classificar por média geral (LP+MAT combinados)
   const classificarProficienciaGeral = (notaSAEB: number, etapa: string): NivelProficiencia => {
     const escalaOriginal = notaSAEB * 50;
     
@@ -164,14 +162,162 @@ export default function Home() {
     };
   };
 
-  if (loading) {
+  // ============================================
+  // useEffect e outras funções
+  // ============================================
+
+  useEffect(() => {
+    // Verificar se já foi verificado nesta sessão
+    const jaVerificado = sessionStorage.getItem('dien_verified');
+    if (jaVerificado === 'true') {
+      setShowCodeModal(false);
+      setCodigoVerificado(true);
+    }
+    
+    fetch('/saeb.json')
+      .then(res => res.json())
+      .then(data => {
+        setDados(data);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error('Erro ao carregar dados:', error);
+        setLoading(false);
+      });
+  }, []);
+
+  const verificarCodigo = () => {
+    if (codigo === 'DIEN2026') {
+      setShowCodeModal(false);
+      setCodigoVerificado(true);
+      sessionStorage.setItem('dien_verified', 'true');
+      setCodigoErro('');
+    } else {
+      setCodigoErro('Código incorreto. Tente novamente.');
+      setCodigo('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      verificarCodigo();
+    }
+  };
+
+  // Calcular nota SAEB de uma escola específica
+  const calcularNotaSAEB = (escola: EscolaSAEB) => {
+    const mediaEscola = (escola.lp + escola.mat) / 2;
+    return (mediaEscola / 50) * taxaFluxo;
+  };
+
+  // Cor da nota SAEB baseada no valor
+  const getNotaCor = (nota: number) => {
+    if (nota >= 7) return 'text-green-600';
+    if (nota >= 5) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  // ============================================
+  // RENDERIZAÇÃO DO MODAL (antes do conteúdo)
+  // ============================================
+  
+  if (showCodeModal) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Carregando dados do SAEB...</div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900">
+        <div className="relative max-w-md w-full">
+          {/* Efeito de brilho atrás do modal */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl blur-2xl opacity-20 animate-pulse"></div>
+          
+          {/* Modal principal */}
+          <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all">
+            {/* Barra superior colorida */}
+            <div className="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500"></div>
+            
+            <div className="p-8">
+              {/* Ícone de segurança */}
+              <div className="flex justify-center mb-6">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+              </div>
+              
+              {/* Título e descrição */}
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  Acesso Restrito
+                </h2>
+                <p className="text-gray-500 text-sm">
+                  Este dashboard contém dados confidenciais do SAEB.
+                </p>
+                <p className="text-gray-500 text-sm mt-1">
+                  Digite o código de acesso para continuar.
+                </p>
+              </div>
+              
+              {/* Campo de código */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Código de Acesso
+                </label>
+                <input
+                  type="password"
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Digite o código..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center text-lg tracking-wider font-mono"
+                  autoFocus
+                />
+                {codigoErro && (
+                  <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {codigoErro}
+                  </p>
+                )}
+              </div>
+              
+              {/* Botão de verificar */}
+              <button
+                onClick={verificarCodigo}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-[1.02] shadow-lg"
+              >
+                Verificar Acesso
+              </button>
+              
+              {/* Texto de segurança */}
+              <p className="text-center text-xs text-gray-400 mt-6">
+                🔒 Sistema seguro | Acesso monitorado
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ============================================
+  // LOADING
+  // ============================================
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-xl text-gray-600">Carregando dados do SAEB...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================
+  // PROCESSAMENTO DOS DADOS
+  // ============================================
+  
   // Filtrar por etapa
   let dadosFiltrados = dados.filter(d => d.etapa === etapa);
   
@@ -186,15 +332,8 @@ export default function Home() {
   const mediaGeral = (mediaLP + mediaMAT) / 2;
 
   // NOTA SAEB (0-10)
-  // Fórmula: (média geral / 50) × taxa de fluxo
   const notaSAEB = (mediaGeral / 50) * taxaFluxo;
   const classificacaoGeral = classificarProficienciaGeral(notaSAEB, etapa);
-
-  // Função para calcular nota SAEB de uma escola específica
-  const calcularNotaSAEB = (escola: EscolaSAEB) => {
-    const mediaEscola = (escola.lp + escola.mat) / 2;
-    return (mediaEscola / 50) * taxaFluxo;
-  };
 
   // Dados para o gráfico por escola
   const dadosGrafico = dadosFiltrados.map(d => {
@@ -223,12 +362,9 @@ export default function Home() {
   // Lista única de escolas para o filtro
   const escolasUnicas = [...new Set(dados.filter(d => d.etapa === etapa).map(d => d.escola))];
 
-  // Cor da nota SAEB baseada no valor
-  const getNotaCor = (nota: number) => {
-    if (nota >= 7) return 'text-green-600';
-    if (nota >= 5) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  // ============================================
+  // RENDERIZAÇÃO PRINCIPAL
+  // ============================================
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -236,6 +372,13 @@ export default function Home() {
       <div className="bg-blue-800 text-white p-6 shadow-lg">
         <h1 className="text-3xl font-bold">📊 Dashboard SAEB 2025</h1>
         <p className="text-blue-200 mt-2">Resultados preliminares por escola | Nota padronizada 0 a 10 | Níveis INEP</p>
+        {/* Badge de acesso verificado */}
+        <div className="mt-2 inline-flex items-center gap-1 bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          Acesso Verificado
+        </div>
       </div>
 
       <div className="p-6">
@@ -338,7 +481,7 @@ export default function Home() {
               : 'bg-gradient-to-r from-orange-600 to-orange-700'
           }`}>
             <p className="text-sm opacity-90">
-              {taxaFluxo === 1 ? '⭐ NOTA SAEB (0-10)' : '🎲 SIMULAÇÃO SAEB'}
+              {taxaFluxo === 1 ? '⭐ NOTA SAEB (0-10) - (previsão)' : '🎲 SIMULAÇÃO SAEB'}
             </p>
             <p className="text-4xl font-bold mt-2">{notaSAEB.toFixed(1)}</p>
             <p className="text-xs mt-2">
@@ -486,17 +629,17 @@ export default function Home() {
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">{escola.escola}</td>
                       <td className="px-6 py-4 text-sm font-medium">{Math.round(escola.lp)}</td>
-                      <td className={`px-6  py-4 text-sm rounded-full ${nivelLP.corFundo} ${nivelLP.cor} font-medium`}>
+                      <td className={`px-6 py-4 text-sm rounded-full ${nivelLP.corFundo} ${nivelLP.cor} font-medium`}>
                         {nivelLP.nivel}
                       </td>
                       <td className="px-6 py-4 text-sm font-medium">{Math.round(escola.mat)}</td>
                       <td className={`px-6 py-4 text-sm rounded-full ${nivelMAT.corFundo} ${nivelMAT.cor} font-medium`}>
                         {nivelMAT.nivel}
-                       </td>
+                      </td>
                       <td className="px-6 py-4 text-sm">{Math.round(mediaBruta)}</td>
                       <td className={`px-6 py-4 text-sm font-bold ${getNotaCor(notaSAEBEscola)}`}>
                         {notaSAEBEscola.toFixed(1)}
-                       </td>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-500">{escola.alunos_presentes}</td>
                     </tr>
                   );

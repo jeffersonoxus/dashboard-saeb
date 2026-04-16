@@ -288,14 +288,14 @@ export default function Home() {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900">
         <div className="relative max-w-md w-full">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl blur-2xl opacity-20 animate-pulse"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-purple-600 rounded-3xl blur-2xl opacity-20 animate-pulse"></div>
           
           <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500"></div>
+            <div className="h-2 bg-gradient-to-r from-purple-300 via-purple-500 to-indigo-500"></div>
             
             <div className="p-8">
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
                   <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -304,10 +304,10 @@ export default function Home() {
               
               <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                  Acesso Restrito - Dados da Rede
+                  Acesso Restrito - DIEN
                 </h2>
                 <p className="text-gray-500 text-sm">
-                  Digite o código de acesso para visualizar os dados completos da rede municipal.
+                  Digite o código de acesso para visualizar os dados completos da rede municipal de Rio Largo 2025.
                 </p>
               </div>
               
@@ -334,12 +334,6 @@ export default function Home() {
                 )}
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-3 mb-6">
-                <p className="text-xs text-gray-400 text-center">
-                  💡 Código: DIEN2026
-                </p>
-              </div>
-              
               <button
                 onClick={verificarCodigo}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg"
@@ -362,7 +356,7 @@ export default function Home() {
       {/* Cabeçalho */}
       <div className="bg-gradient-to-r from-blue-800 to-indigo-800 text-white p-6 shadow-lg">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold">📊 Sistema SAEB</h1>
+          <h1 className="text-3xl font-bold">📊 Dashboard SAEB 2025 - Rio Largo</h1>
           <p className="text-blue-200 mt-2">
             {!mostrarDadosRede 
               ? 'Calculadora de Nota Padronizada (0-10) com base nas proficiências SAEB'
@@ -496,22 +490,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Fórmula utilizada */}
-                <div className="mt-4 p-3 bg-white rounded-lg text-xs">
-                  <p className="font-semibold text-gray-700 mb-1">📐 Fórmula utilizada (Nota Técnica SAEB):</p>
-                  {etapa === '9º' ? (
-                    <div className="text-gray-600 space-y-1">
-                      <p>9º ano: Nota LP = [(Prof LP - 100) / (400 - 100)] × 10</p>
-                      <p>9º ano: Nota MAT = [(Prof MAT - 100) / (400 - 100)] × 10</p>
-                    </div>
-                  ) : (
-                    <div className="text-gray-600 space-y-1">
-                      <p>5º ano: Nota LP = [(Prof LP - 49) / (324 - 49)] × 10</p>
-                      <p>5º ano: Nota MAT = [(Prof MAT - 60) / (322 - 60)] × 10</p>
-                    </div>
-                  )}
-                  <p className="text-gray-500 mt-1">Nota Final = (Nota LP + Nota MAT) / 2 × Taxa de Fluxo</p>
-                </div>
+                
 
                 {/* Níveis de Proficiência */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-blue-200">
@@ -824,10 +803,8 @@ export default function Home() {
 
         {/* Rodapé */}
         <div className="mt-8 text-center text-xs text-gray-400">
-          <p>Sistema SAEB - Baseado na Nota Técnica Oficial do INEP</p>
-          <p className="mt-1">
-            Fórmulas: 5º ano LP: [(Prof - 49)/275]×10 | 5º ano MAT: [(Prof - 60)/262]×10 | 9º ano: [(Prof - 100)/300]×10
-          </p>
+          <p>Baseado na Nota Técnica Oficial do INEP</p>
+          <p>Desenvolvido por Jefferson</p>
         </div>
       </div>
     </div>
